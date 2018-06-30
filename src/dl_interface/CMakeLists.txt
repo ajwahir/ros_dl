@@ -15,187 +15,148 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
 )
 
-## System dependencies are found with CMake's conventions
-# find_package(Boost REQUIRED COMPONENTS system)
+find_package(CUDA)
+find_package(OpenCV REQUIRED)
+find_package(OpenMP)
+
+catkin_package(CATKIN_DEPENDS
+        cv_bridge
+        image_transport
+        roscpp
+        sensor_msgs
+        std_msgs
+        )
 
 
-## Uncomment this if the package has a setup.py. This macro ensures
-## modules and global scripts declared therein get installed
-## See http://ros.org/doc/api/catkin/html/user_guide/setup_dot_py.html
-# catkin_python_setup()
+set(CMAKE_CXX_FLAGS "-std=c++11 -O3 -g -Wall ${CMAKE_CXX_FLAGS}")
 
-################################################
-## Declare ROS messages, services and actions ##
-################################################
+IF (CUDA_FOUND)
+    list(APPEND CUDA_NVCC_FLAGS "--std=c++11 -I$${PROJECT_SOURCE_DIR}/darknet/src -I${PROJECT_SOURCE_DIR}/src -DGPU")
+    SET(CUDA_PROPAGATE_HOST_FLAGS OFF)
 
-## To declare and build messages, services or actions from within this
-## package, follow these steps:
-## * Let MSG_DEP_SET be the set of packages whose message types you use in
-##   your messages/services/actions (e.g. std_msgs, actionlib_msgs, ...).
-## * In the file package.xml:
-##   * add a build_depend tag for "message_generation"
-##   * add a build_depend and a exec_depend tag for each package in MSG_DEP_SET
-##   * If MSG_DEP_SET isn't empty the following dependency has been pulled in
-##     but can be declared for certainty nonetheless:
-##     * add a exec_depend tag for "message_runtime"
-## * In this file (CMakeLists.txt):
-##   * add "message_generation" and every package in MSG_DEP_SET to
-##     find_package(catkin REQUIRED COMPONENTS ...)
-##   * add "message_runtime" and every package in MSG_DEP_SET to
-##     catkin_package(CATKIN_DEPENDS ...)
-##   * uncomment the add_*_files sections below as needed
-##     and list every .msg/.srv/.action file to be processed
-##   * uncomment the generate_messages entry below
-##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
+    #darknet
+    cuda_add_library(darknet_roslib SHARED
+            darknet/src/activation_kernels.cu
+            darknet/src/avgpool_layer_kernels.cu
+            darknet/src/convolutional_kernels.cu
+            darknet/src/crop_layer_kernels.cu
+            darknet/src/col2im_kernels.cu
+            darknet/src/blas_kernels.cu
+            darknet/src/deconvolutional_kernels.cu
+            darknet/src/dropout_layer_kernels.cu
+            darknet/src/im2col_kernels.cu
+            darknet/src/maxpool_layer_kernels.cu
 
-## Generate messages in the 'msg' folder
-# add_message_files(
-#   FILES
-#   Message1.msg
-#   Message2.msg
-# )
+            darknet/src/gemm.c
+            darknet/src/utils.c
+            darknet/src/cuda.c
+            darknet/src/deconvolutional_layer.c
+            darknet/src/convolutional_layer.c
+            darknet/src/list.c
+            darknet/src/image.c
+            darknet/src/activations.c
+            darknet/src/im2col.c
+            darknet/src/col2im.c
+            darknet/src/blas.c
+            darknet/src/crop_layer.c
+            darknet/src/dropout_layer.c
+            darknet/src/maxpool_layer.c
+            darknet/src/softmax_layer.c
+            darknet/src/data.c
+            darknet/src/matrix.c
+            darknet/src/network.c
+            darknet/src/connected_layer.c
+            darknet/src/cost_layer.c
+            darknet/src/parser.c
+            darknet/src/option_list.c
+            darknet/src/detection_layer.c
+            darknet/src/route_layer.c
+            darknet/src/upsample_layer.c
+            darknet/src/box.c
+            darknet/src/normalization_layer.c
+            darknet/src/avgpool_layer.c
+            darknet/src/layer.c
+            darknet/src/local_layer.c
+            darknet/src/shortcut_layer.c
+            darknet/src/logistic_layer.c
+            darknet/src/activation_layer.c
+            darknet/src/rnn_layer.c
+            darknet/src/gru_layer.c
+            darknet/src/crnn_layer.c
+            darknet/src/batchnorm_layer.c
+            darknet/src/region_layer.c
+            darknet/src/reorg_layer.c
+            darknet/src/tree.c
+            darknet/src/lstm_layer.c
+            darknet/src/l2norm_layer.c
+            darknet/src/yolo_layer.c
+            )
 
-## Generate services in the 'srv' folder
-# add_service_files(
-#   FILES
-#   Service1.srv
-#   Service2.srv
-# )
+    target_compile_definitions(darknet_roslib PUBLIC -DGPU)
+    cuda_add_cublas_to_target(darknet_roslib)
 
-## Generate actions in the 'action' folder
-# add_action_files(
-#   FILES
-#   Action1.action
-#   Action2.action
-# )
+    if (OPENMP_FOUND)
+        set_target_properties(darknet_roslib PROPERTIES
+                COMPILE_FLAGS ${OpenMP_CXX_FLAGS}
+                LINK_FLAGS ${OpenMP_CXX_FLAGS}
+                )
+    endif ()
 
-## Generate added messages and services with any dependencies listed here
-# generate_messages(
-#   DEPENDENCIES
-#   sensor_msgs#   std_msgs
-# )
+    target_include_directories(darknet_roslib PRIVATE
+            ${OpenCV_INCLUDE_DIR}
+            ${catkin_INCLUDE_DIRS}
+            ${Boost_INCLUDE_DIRS}
+            ${CUDA_INCLUDE_DIRS}
+            ${PROJECT_SOURCE_DIR}/darknet
+            ${PROJECT_SOURCE_DIR}/darknet/src
+            ${PROJECT_SOURCE_DIR}/src
+            )
 
-################################################
-## Declare ROS dynamic reconfigure parameters ##
-################################################
+    target_link_libraries(darknet_roslib
+            ${OpenCV_LIBRARIES}
+            ${catkin_LIBRARIES}
+            ${PCL_LIBRARIES}
+            ${Qt5Core_LIBRARIES}
+            ${CUDA_LIBRARIES}
+            ${CUDA_CUBLAS_LIBRARIES}
+            ${CUDA_curand_LIBRARY}
+            )
 
-## To declare and build dynamic reconfigure parameters within this
-## package, follow these steps:
-## * In the file package.xml:
-##   * add a build_depend and a exec_depend tag for "dynamic_reconfigure"
-## * In this file (CMakeLists.txt):
-##   * add "dynamic_reconfigure" to
-##     find_package(catkin REQUIRED COMPONENTS ...)
-##   * uncomment the "generate_dynamic_reconfigure_options" section below
-##     and list every .cfg file to be processed
+    add_dependencies(darknet_roslib
+            ${catkin_EXPORTED_TARGETS}
+            )
 
-## Generate dynamic reconfigure parameters in the 'cfg' folder
-# generate_dynamic_reconfigure_options(
-#   cfg/DynReconf1.cfg
-#   cfg/DynReconf2.cfg
-# )
+    #ros node
+    cuda_add_executable(dark_ros
+            src/dark_ros.cpp
+            )
 
-###################################
-## catkin specific configuration ##
-###################################
-## The catkin_package macro generates cmake config files for your package
-## Declare things to be passed to dependent projects
-## INCLUDE_DIRS: uncomment this if your package contains header files
-## LIBRARIES: libraries you create in this project that dependent projects also need
-## CATKIN_DEPENDS: catkin_packages dependent projects also need
-## DEPENDS: system dependencies of this project that dependent projects also need
-catkin_package(
-#  INCLUDE_DIRS include
-#  LIBRARIES dl_interface
-#  CATKIN_DEPENDS cv_bridge image_transport roscpp sensor_msgs std_msgs
-#  DEPENDS system_lib
-)
+    target_compile_definitions(dark_ros PUBLIC -DGPU)
 
-###########
-## Build ##
-###########
+    target_include_directories(dark_ros PRIVATE
+            ${CUDA_INCLUDE_DIRS}
+            ${catkin_INCLUDE_DIRS}
+            ${PROJECT_SOURCE_DIR}/darknet
+            ${PROJECT_SOURCE_DIR}/darknet/src
+            ${PROJECT_SOURCE_DIR}/src
+            )
 
-## Specify additional locations of header files
-## Your package locations should be listed before other locations
-include_directories(
-# include
-  ${catkin_INCLUDE_DIRS}
-)
-
-## Declare a C++ library
-# add_library(${PROJECT_NAME}
-#   src/${PROJECT_NAME}/dl_interface.cpp
-# )
-
-## Add cmake target dependencies of the library
-## as an example, code may need to be generated before libraries
-## either from message generation or dynamic reconfigure
-# add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-
-## Declare a C++ executable
-## With catkin_make all packages are built within a single CMake context
-## The recommended prefix ensures that target names across packages don't collide
-# add_executable(${PROJECT_NAME}_node src/dl_interface_node.cpp)
-
-## Rename C++ executable without prefix
-## The above recommended prefix causes long target names, the following renames the
-## target back to the shorter version for ease of user use
-## e.g. "rosrun someones_pkg node" instead of "rosrun someones_pkg someones_pkg_node"
-# set_target_properties(${PROJECT_NAME}_node PROPERTIES OUTPUT_NAME node PREFIX "")
-
-## Add cmake target dependencies of the executable
-## same as for the library above
-# add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-
-## Specify libraries to link a library or executable target against
-# target_link_libraries(${PROJECT_NAME}_node
-#   ${catkin_LIBRARIES}
-# )
-
-#############
-## Install ##
-#############
-
-# all install targets should use catkin DESTINATION variables
-# See http://ros.org/doc/api/catkin/html/adv_user_guide/variables.html
-
-## Mark executable scripts (Python etc.) for installation
-## in contrast to setup.py, you can choose the destination
-# install(PROGRAMS
-#   scripts/my_python_script
-#   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-# )
-
-## Mark executables and/or libraries for installation
-# install(TARGETS ${PROJECT_NAME} ${PROJECT_NAME}_node
-#   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-#   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-#   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-# )
-
-## Mark cpp header files for installation
-# install(DIRECTORY include/${PROJECT_NAME}/
-#   DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
-#   FILES_MATCHING PATTERN "*.h"
-#   PATTERN ".svn" EXCLUDE
-# )
-
-## Mark other files for installation (e.g. launch and bag files, etc.)
-# install(FILES
-#   # myfile1
-#   # myfile2
-#   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-# )
-
-#############
-## Testing ##
-#############
-
-## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_dl_interface.cpp)
-# if(TARGET ${PROJECT_NAME}-test)
-#   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
-# endif()
-
-## Add folders to be run by python nosetests
-# catkin_add_nosetests(test)
+    target_link_libraries(dark_ros
+            ${catkin_LIBRARIES}
+            ${OpenCV_LIBS}
+            ${CUDA_LIBRARIES}
+            ${CUDA_CUBLAS_LIBRARIES}
+            ${CUDA_curand_LIBRARY}
+            darknet_roslib
+            )
+    add_dependencies(dark_ros
+            ${catkin_EXPORTED_TARGETS}
+            )
+    install(TARGETS darknet_roslib dark_ros
+            ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+            LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+            RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+            )
+ELSE()
+    message("CUDA Not found. The package won't be built")
+ENDIF ()
