@@ -33,7 +33,20 @@ set(CMAKE_CXX_FLAGS "-std=c++11 -O3 -g -Wall ${CMAKE_CXX_FLAGS}")
 IF (CUDA_FOUND)
     list(APPEND CUDA_NVCC_FLAGS "--std=c++11 -I$${PROJECT_SOURCE_DIR}/darknet/src -I${PROJECT_SOURCE_DIR}/src -DGPU")
     SET(CUDA_PROPAGATE_HOST_FLAGS OFF)
-
+    message(STATUS "CUDA Version: ${CUDA_VERSION_STRINGS}")
+    message(STATUS "CUDA Libararies: ${CUDA_LIBRARIES}")
+    set(
+      CUDA_NVCC_FLAGS
+      ${CUDA_NVCC_FLAGS};
+      -O3
+      -gencode arch=compute_30,code=sm_30
+      -gencode arch=compute_35,code=sm_35
+      -gencode arch=compute_50,code=[sm_50,compute_50]
+      -gencode arch=compute_52,code=[sm_52,compute_52]
+      -gencode arch=compute_61,code=sm_61
+      -gencode arch=compute_62,code=sm_62
+    )
+    add_definitions(-DGPU)
     #darknet
     cuda_add_library(darknet_roslib SHARED
             darknet/src/activation_kernels.cu

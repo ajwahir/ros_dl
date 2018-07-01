@@ -292,7 +292,7 @@ int main(int argc, char **argv)
   //Network stuff
   //Here we have to give a condition, if the network chosen in YOLO
   //parameters which are to be converted with yaml
-  std::string image_raw_topic_str = "/image_raw", network_definition_file = "/home/ajwahir/ros_dl/src/dl_interface/darknet/cfg/yolov3.cfg" ,pretrained_model_file = "/home/ajwahir/ros_dl/src/dl_interface/darknet/data/yolov3.weights" ;
+  std::string image_raw_topic_str = "/usb_cam/image_raw", network_definition_file = "/home/ajwahir/ros_dl/src/dl_interface/darknet/cfg/yolo.cfg" ,pretrained_model_file = "/home/ajwahir/ros_dl/src/dl_interface/darknet/data/yolo.weights" ;
   float score_threshold_ = 0.5, nms_threshold_ = 0.45;
   ros::Subscriber subscriber_image_raw_;
 
@@ -302,7 +302,7 @@ int main(int argc, char **argv)
 
   ROS_INFO("Subscribing to... %s", image_raw_topic_str.c_str());
   subscriber_image_raw_ = nh.subscribe(image_raw_topic_str, 1, image_callback);
-
+  ros::spin();
 
   return 0;
 }
