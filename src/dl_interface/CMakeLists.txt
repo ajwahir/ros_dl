@@ -129,6 +129,7 @@ IF (CUDA_FOUND)
     #ros node
     cuda_add_executable(dark_ros
             src/dark_ros.cpp
+            src/dark_yolo.h
             )
 
     target_compile_definitions(dark_ros PUBLIC -DGPU)
