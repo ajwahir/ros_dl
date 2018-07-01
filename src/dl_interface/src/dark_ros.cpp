@@ -239,6 +239,18 @@ image convert_ipl_to_image(const sensor_msgs::ImageConstPtr& msg)
     return darknet_image;
 }
 
+int maximum_in_array(float* array, int N){
+  float big = array[0];
+  int idx = 0;
+  for(int i = 1; i < N; i++){
+    if(big < array[i]){
+      big = array[i];
+      idx = i;
+    }
+  }
+  return idx;
+}
+
 void image_callback(const sensor_msgs::ImageConstPtr& in_image_message)
 {
     std::vector< RectClassScore<float> > detections;
@@ -248,8 +260,14 @@ void image_callback(const sensor_msgs::ImageConstPtr& in_image_message)
     detections = yolo_detector_.detect(darknet_image_);
 
     //Check the if the network is able to score_threshold
+    float score_array[detections.size()];
+    for (unsigned int i = 0; i < detections.size(); ++i)
+      score_array[i] = detections[i].score;
 
-    std::cout<<detections[0].score<<std::endl;
+    int idx_max = maximum_in_array(score_array,detections.size());
+    std::cout<<"Score: "<<detections[idx_max].score<<" "<<"Class: "<<detections[idx_max].class_type<<std::endl;
+
+
     // //Prepare Output message
     // autoware_msgs::image_obj output_car_message;
     // autoware_msgs::image_obj output_person_message;
