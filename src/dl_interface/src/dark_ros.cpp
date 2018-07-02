@@ -194,6 +194,8 @@ namespace darknet
         float *prediction = network_predict(classify_network_, in_data);
 
         if(classify_network_->hierarchy) hierarchy_predictions(prediction, classify_network_->outputs, classify_network_->hierarchy, 1, 1);
+        std::cout<<prediction<<std::endl;
+
         // layer output_layer = classify_network_->layers[classify_network_->n - 1];
         //
         // output_layer.output = prediction;
