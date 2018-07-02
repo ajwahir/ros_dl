@@ -194,7 +194,8 @@ namespace darknet
         float *prediction = network_predict(classify_network_, in_data);
 
         if(classify_network_->hierarchy) hierarchy_predictions(prediction, classify_network_->outputs, classify_network_->hierarchy, 1, 1);
-        std::cout<<prediction<<std::endl;
+        std::cout<<prediction[0]<<std::endl;
+        std::cout<<"enters the function yo"<<std::endl;
 
         // layer output_layer = classify_network_->layers[classify_network_->n - 1];
         //
@@ -526,7 +527,7 @@ int main(int argc, char **argv)
 
     ROS_INFO("Subscribing to... %s", image_raw_topic_str.c_str());
     // detect_publish = nh.advertise<dark_msgs::DetectArray>("detected_objects", 1);
-    subscriber_image_raw_ = nh.subscribe(image_raw_topic_str, 1, image_callback);
+    subscriber_image_raw_ = nh.subscribe(image_raw_topic_str, 1, image_callback_classify);
   }
 
 
