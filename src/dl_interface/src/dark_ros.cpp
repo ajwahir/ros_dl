@@ -3,10 +3,13 @@
 #include <signal.h>
 #include <stdio.h>
 #include <boost/bind.hpp>
+#include <dark_msgs/Detect.h>
+#include <dark_msgs/DetectArray.h>
 
 #include "dark_yolo.h"
 
 darknet::Yolo yolo_detector_;
+ros::Publisher detect_publish;
 
 namespace darknet
 {
@@ -260,29 +263,46 @@ void image_callback(const sensor_msgs::ImageConstPtr& in_image_message)
     detections = yolo_detector_.detect(darknet_image_);
 
     //Check the if the network is able to score_threshold
-    float score_array[detections.size()];
+    // float score_array[detections.size()];
+    // for (unsigned int i = 0; i < detections.size(); ++i)
+    //   score_array[i] = detections[i].score;
+    //
+    // int idx_max = maximum_in_array(score_array,detections.size());
+    // std::cout<<"Score: "<<detections[idx_max].score<<" "<<"Class: "<<detections[idx_max].class_type<<std::endl;
+
+    //Output messages for detect /darknet_ros
+
+    dark_msgs::DetectArray output_detect_array;
+    output_detect_array.header = in_image_message->header;
     for (unsigned int i = 0; i < detections.size(); ++i)
-      score_array[i] = detections[i].score;
+    {
+        if(detections.size()>0)
+        {
+            dark_msgs::Detect output_detect;
 
-    int idx_max = maximum_in_array(score_array,detections.size());
-    std::cout<<"Score: "<<detections[idx_max].score<<" "<<"Class: "<<detections[idx_max].class_type<<std::endl;
+            output_detect.x = detections[i].x;
+            output_detect.y = detections[i].y;
+            output_detect.w = detections[i].w;
+            output_detect.h = detections[i].h;
+            if (detections[i].x < 0)
+                output_detect.x = 0;
+            if (detections[i].y < 0)
+                output_detect.y = 0;
+            if (detections[i].w < 0)
+                output_detect.w = 0;
+            if (detections[i].h < 0)
+                output_detect.h = 0;
 
+            output_detect.score = detections[i].score;
+            output_detect.class_id = detections[i].class_type;
+            //std::cout << "x "<< rect.x<< " y " << rect.y << " w "<< rect.width << " h "<< rect.height<< " s " << rect.score << " c " << in_objects[i].class_type << std::endl;
 
-    // //Prepare Output message
-    // autoware_msgs::image_obj output_car_message;
-    // autoware_msgs::image_obj output_person_message;
-    // output_car_message.header = in_image_message->header;
-    // output_car_message.type = "car";
-    //
-    // output_person_message.header = in_image_message->header;
-    // output_person_message.type = "person";
-    //
-    // convert_rect_to_image_obj(detections, output_car_message, "car");
-    // convert_rect_to_image_obj(detections, output_person_message, "person");
-    //
-    // publisher_car_objects_.publish(output_car_message);
-    // publisher_person_objects_.publish(output_person_message);
+            output_detect_array.objects.push_back(output_detect);
 
+        }
+    }
+
+    detect_publish.publish(output_detect_array);
     free(darknet_image_.data);
 }
 
@@ -319,7 +339,10 @@ int main(int argc, char **argv)
   ROS_INFO("Initialization complete.");
 
   ROS_INFO("Subscribing to... %s", image_raw_topic_str.c_str());
+  detect_publish = nh.advertise<dark_msgs::DetectArray>("detected_objects", 1);
   subscriber_image_raw_ = nh.subscribe(image_raw_topic_str, 1, image_callback);
+
+
   ros::spin();
 
   return 0;

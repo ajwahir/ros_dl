@@ -13,19 +13,21 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   sensor_msgs
   std_msgs
+  dark_msgs
 )
 
 find_package(CUDA)
 find_package(OpenCV REQUIRED)
 find_package(OpenMP)
 
-catkin_package(CATKIN_DEPENDS
-        cv_bridge
+catkin_package(
+        CATKIN_DEPENDS cv_bridge
         image_transport
         roscpp
         sensor_msgs
         std_msgs
-        )
+        dark_msgs
+)
 
 
 set(CMAKE_CXX_FLAGS "-std=c++11 -O3 -g -Wall ${CMAKE_CXX_FLAGS}")
