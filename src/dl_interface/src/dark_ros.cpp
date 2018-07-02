@@ -9,6 +9,8 @@
 #include "dark_yolo.h"
 
 darknet::Yolo yolo_detector_;
+darknet::Classify classifier_;
+
 ros::Publisher detect_publish;
 
 namespace darknet
@@ -123,54 +125,119 @@ namespace darknet
         //std::cout << std::endl;
         return detections;
     }
+
+    uint32_t Classify::get_network_height()
+    {
+        return classify_network_->h;
+    }
+    uint32_t Classify::get_network_width()
+    {
+        return classify_network_->w;
+    }
+    void Classify::load(std::string& in_model_file, std::string& in_trained_file)
+    {
+        classify_network_ = parse_network_cfg(&in_model_file[0]);
+        // load_weights(classify_network_, &in_trained_file[0]);
+        // set_batch_network(classify_network_, 1);
+
+
+        // layer output_layer = classify_network_->layers[classify_network_->n - 1];
+        // darknet_boxes_.resize(output_layer.w * output_layer.h * output_layer.n);
+    }
+
+    Classify::~Classify()
+    {
+        free_network(classify_network_);
+    }
+
+    void Classify::classify_image(image& in_darknet_image)
+    {
+        return forward(in_darknet_image);
+    }
+
+    image Classify::convert_image(const sensor_msgs::ImageConstPtr& msg)
+    {
+        if (msg->encoding != sensor_msgs::image_encodings::BGR8)
+        {
+            ROS_ERROR("Unsupported encoding");
+            exit(-1);
+        }
+
+        auto data = msg->data;
+        uint32_t height = msg->height, width = msg->width, offset = msg->step - 3 * width;
+        uint32_t i = 0, j = 0;
+        image im = make_image(width, height, 3);
+
+        for (uint32_t line = height; line; line--)
+        {
+            for (uint32_t column = width; column; column--)
+            {
+                for (uint32_t channel = 0; channel < 3; channel++)
+                    im.data[i + width * height * channel] = data[j++] / 255.;
+                i++;
+            }
+            j += offset;
+        }
+
+        if (classify_network_->w == (int) width && classify_network_->h == (int) height)
+        {
+            return im;
+        }
+        image resized = resize_image(im, classify_network_->w, classify_network_->h);
+        free_image(im);
+        return resized;
+    }
+
+    void Classify::forward(image& in_darknet_image)
+    {
+        float * in_data = in_darknet_image.data;
+        float *prediction = network_predict(classify_network_, in_data);
+
+        if(classify_network_->hierarchy) hierarchy_predictions(prediction, classify_network_->outputs, classify_network_->hierarchy, 1, 1);
+        // layer output_layer = classify_network_->layers[classify_network_->n - 1];
+        //
+        // output_layer.output = prediction;
+        // int nboxes = 0;
+        // int num_classes = output_layer.classes;
+        // detection *darknet_detections = get_network_boxes(classify_network_, classify_network_->w, classify_network_->h, min_confidence_, .5, NULL, 0, &nboxes);
+        //
+        // do_nms_sort(darknet_detections, nboxes, num_classes, nms_threshold_);
+        //
+        // std::vector< RectClassScore<float> > detections;
+        //
+        // for (int i = 0; i < nboxes; i++)
+        // {
+        //     int class_id = -1;
+        //     float score = 0.f;
+        //     //find the class
+        //     for(int j = 0; j < num_classes; ++j){
+        //         if (darknet_detections[i].prob[j] >= min_confidence_){
+        //             if (class_id < 0) {
+        //                 class_id = j;
+        //                 score = darknet_detections[i].prob[j];
+        //             }
+        //         }
+        //     }
+        //     //if class found
+        //     if (class_id >= 0)
+        //     {
+        //         RectClassScore<float> detection;
+        //
+        //         detection.x = darknet_detections[i].bbox.x - darknet_detections[i].bbox.w/2;
+        //         detection.y = darknet_detections[i].bbox.y - darknet_detections[i].bbox.h/2;
+        //         detection.w = darknet_detections[i].bbox.w;
+        //         detection.h = darknet_detections[i].bbox.h;
+        //         detection.score = score;
+        //         detection.class_type = class_id;
+        //         //std::cout << detection.toString() << std::endl;
+        //
+        //         detections.push_back(detection);
+        //     }
+        // }
+        // //std::cout << std::endl;
+        // return detections;
+    }
 }  // namespace darknet
-
-///////////////////
-
-// void YoloNode::convert_rect_to_image_obj(std::vector< RectClassScore<float> >& in_objects, autoware_msgs::image_obj& out_message, std::string in_class)
-// {
-//     for (unsigned int i = 0; i < in_objects.size(); ++i)
-//     {
-//         if ( (in_class == "car"
-//               && (in_objects[i].class_type == Yolo3::CAR
-//                   || in_objects[i].class_type == Yolo3::BUS
-//                   || in_objects[i].class_type == Yolo3::TRUCK
-//                   || in_objects[i].class_type == Yolo3::MOTORBIKE
-//               )
-//              ) || (in_class == "person"
-//                && (in_objects[i].class_type == Yolo3::PERSON
-//                    || in_objects[i].class_type == Yolo3::BICYCLE
-//                    || in_objects[i].class_type == Yolo3::DOG
-//                    || in_objects[i].class_type == Yolo3::CAT
-//                    || in_objects[i].class_type == Yolo3::HORSE
-//                    )
-//                   )
-//         )
-//         {
-//             autoware_msgs::image_rect rect;
-//
-//             rect.x = (in_objects[i].x /image_ratio_) - image_left_right_border_/image_ratio_;
-//             rect.y = (in_objects[i].y /image_ratio_) - image_top_bottom_border_/image_ratio_;
-//             rect.width = in_objects[i].w /image_ratio_;
-//             rect.height = in_objects[i].h /image_ratio_;
-//             if (in_objects[i].x < 0)
-//                 rect.x = 0;
-//             if (in_objects[i].y < 0)
-//                 rect.y = 0;
-//             if (in_objects[i].w < 0)
-//                 rect.width = 0;
-//             if (in_objects[i].h < 0)
-//                 rect.height = 0;
-//
-//             rect.score = in_objects[i].score;
-//
-//             //std::cout << "x "<< rect.x<< " y " << rect.y << " w "<< rect.width << " h "<< rect.height<< " s " << rect.score << " c " << in_objects[i].class_type << std::endl;
-//
-//             out_message.obj.push_back(rect);
-//
-//         }
-//     }
-// }
 
 void rgbgr_image_y(image& im)
 {
@@ -327,20 +394,36 @@ int main(int argc, char **argv)
   ros::NodeHandle nh("~");
   signal(SIGINT, mySigintHandler);
 
+  int flag = 1; //temprorily - detection 0, classification 1, segmentation 2
   //Network stuff
   //Here we have to give a condition, if the network chosen in YOLO
   //parameters which are to be converted with yaml
-  std::string image_raw_topic_str = "/usb_cam/image_raw", network_definition_file = "/home/ajwahir/ros_dl/src/dl_interface/darknet/cfg/yolo.cfg" ,pretrained_model_file = "/home/ajwahir/ros_dl/src/dl_interface/darknet/data/yolo.weights" ;
-  float score_threshold_ = 0.5, nms_threshold_ = 0.45;
-  ros::Subscriber subscriber_image_raw_;
 
-  ROS_INFO("Initializing the network on Darknet...");
-  yolo_detector_.load(network_definition_file, pretrained_model_file, score_threshold_, nms_threshold_);
-  ROS_INFO("Initialization complete.");
+  if(flag==0){
+    std::string image_raw_topic_str = "/usb_cam/image_raw", network_definition_file = "/home/ajwahir/ros_dl/src/dl_interface/darknet/cfg/yolo.cfg" ,pretrained_model_file = "/home/ajwahir/ros_dl/src/dl_interface/darknet/data/yolo.weights" ;
+    float score_threshold_ = 0.5, nms_threshold_ = 0.45;
+    ros::Subscriber subscriber_image_raw_;
 
-  ROS_INFO("Subscribing to... %s", image_raw_topic_str.c_str());
-  detect_publish = nh.advertise<dark_msgs::DetectArray>("detected_objects", 1);
-  subscriber_image_raw_ = nh.subscribe(image_raw_topic_str, 1, image_callback);
+    ROS_INFO("Initializing the network on Darknet...");
+    yolo_detector_.load(network_definition_file, pretrained_model_file, score_threshold_, nms_threshold_);
+    ROS_INFO("Initialization complete.");
+
+    ROS_INFO("Subscribing to... %s", image_raw_topic_str.c_str());
+    detect_publish = nh.advertise<dark_msgs::DetectArray>("detected_objects", 1);
+    subscriber_image_raw_ = nh.subscribe(image_raw_topic_str, 1, image_callback);
+  }
+  else if(flag==1){
+    std::string image_raw_topic_str = "/usb_cam/image_raw", network_definition_file = "/home/ajwahir/ros_dl/src/dl_interface/darknet/cfg/tiny.cfg" ,pretrained_model_file = "/home/ajwahir/ros_dl/src/dl_interface/darknet/data/tiny.weights" ;
+    ros::Subscriber subscriber_image_raw_;
+
+    ROS_INFO("Initializing the network on Darknet...");
+    classifier_.load(network_definition_file, pretrained_model_file);
+    ROS_INFO("Initialization complete.");
+
+    ROS_INFO("Subscribing to... %s", image_raw_topic_str.c_str());
+    // detect_publish = nh.advertise<dark_msgs::DetectArray>("detected_objects", 1);
+    // subscriber_image_raw_ = nh.subscribe(image_raw_topic_str, 1, image_callback);
+  }
 
 
   ros::spin();

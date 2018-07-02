@@ -71,6 +71,23 @@ namespace darknet {
 
 
     };
+
+    class Classify {
+    private:
+        network* classify_network_;
+        void forward(image &in_darknet_image);
+
+    public:
+        Classify() {}
+        void load(std::string &in_model_file, std::string &in_weights);
+        ~Classify();
+        image convert_image(const sensor_msgs::ImageConstPtr &in_image_msg);
+        uint32_t get_network_width();
+        uint32_t get_network_height();
+        void classify_image(image &in_darknet_image);
+
+
+    };
 }  // namespace darknet
 
 // class YoloNode {
