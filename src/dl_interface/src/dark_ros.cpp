@@ -309,16 +309,75 @@ image convert_ipl_to_image(const sensor_msgs::ImageConstPtr& msg)
     return darknet_image;
 }
 
-int maximum_in_array(float* array, int N){
-  float big = array[0];
-  int idx = 0;
-  for(int i = 1; i < N; i++){
-    if(big < array[i]){
-      big = array[i];
-      idx = i;
+// int maximum_in_array(float* array, int N){
+//   float big = array[0];
+//   int idx = 0;
+//   for(int i = 1; i < N; i++){
+//     if(big < array[i]){
+//       big = array[i];
+//       idx = i;
+//     }
+//   }
+//   return idx;
+// }
+
+image convert_ipl_to_image_classify(const sensor_msgs::ImageConstPtr& msg)
+{
+
+    double image_ratio_;
+    uint32_t image_top_bottom_border_;//black strips added to the input image to maintain aspect ratio while resizing it to fit the network input size
+    uint32_t image_left_right_border_;
+
+    cv_bridge::CvImagePtr cv_image = cv_bridge::toCvCopy(msg, "bgr8");//toCvCopy(image_source, sensor_msgs::image_encodings::BGR8);
+    cv::Mat mat_image = cv_image->image;
+
+    uint32_t network_input_width = classifier_.get_network_width();
+    uint32_t network_input_height = classifier_.get_network_height();
+
+    uint32_t image_height = msg->height,
+            image_width = msg->width;
+
+    IplImage ipl_image;
+    cv::Mat final_mat;
+
+    if (network_input_width!=image_width
+        || network_input_height != image_height)
+    {
+        //final_mat = cv::Mat(network_input_width, network_input_height, CV_8UC3, cv::Scalar(0,0,0));
+        image_ratio_ = (double ) network_input_width /  (double)mat_image.cols;
+
+        cv::resize(mat_image, final_mat, cv::Size(), image_ratio_, image_ratio_);
+        image_top_bottom_border_ = abs(final_mat.rows-network_input_height)/2;
+        image_left_right_border_ = abs(final_mat.cols-network_input_width)/2;
+        cv::copyMakeBorder(final_mat, final_mat,
+                           image_top_bottom_border_, image_top_bottom_border_,
+                           image_left_right_border_, image_left_right_border_,
+                           cv::BORDER_CONSTANT, cv::Scalar(0,0,0));
+
     }
-  }
-  return idx;
+    else
+        final_mat = mat_image;
+
+    ipl_image = final_mat;
+
+    unsigned char *data = (unsigned char *)ipl_image.imageData;
+    int h = ipl_image.height;
+    int w = ipl_image.width;
+    int c = ipl_image.nChannels;
+    int step = ipl_image.widthStep;
+    int i, j, k;
+
+    image darknet_image = make_image(w, h, c);
+
+    for(i = 0; i < h; ++i){
+        for(k= 0; k < c; ++k){
+            for(j = 0; j < w; ++j){
+                darknet_image.data[k*w*h + i*w + j] = data[i*step + j*c + k]/255.;
+            }
+        }
+    }
+    rgbgr_image_y(darknet_image);
+    return darknet_image;
 }
 
 void image_callback(const sensor_msgs::ImageConstPtr& in_image_message)
@@ -373,6 +432,49 @@ void image_callback(const sensor_msgs::ImageConstPtr& in_image_message)
     free(darknet_image_.data);
 }
 
+void image_callback_classify(const sensor_msgs::ImageConstPtr& in_image_message)
+{
+    image darknet_image_ = {};
+    darknet_image_ = convert_ipl_to_image_classify(in_image_message);
+
+    classifier_.classify_image(darknet_image_);
+
+    //Output messages for detect /darknet_ros
+
+    // dark_msgs::DetectArray output_detect_array;
+    // output_detect_array.header = in_image_message->header;
+    // for (unsigned int i = 0; i < detections.size(); ++i)
+    // {
+    //     if(detections.size()>0)
+    //     {
+    //         dark_msgs::Detect output_detect;
+    //
+    //         output_detect.x = detections[i].x;
+    //         output_detect.y = detections[i].y;
+    //         output_detect.w = detections[i].w;
+    //         output_detect.h = detections[i].h;
+    //         if (detections[i].x < 0)
+    //             output_detect.x = 0;
+    //         if (detections[i].y < 0)
+    //             output_detect.y = 0;
+    //         if (detections[i].w < 0)
+    //             output_detect.w = 0;
+    //         if (detections[i].h < 0)
+    //             output_detect.h = 0;
+    //
+    //         output_detect.score = detections[i].score;
+    //         output_detect.class_id = detections[i].class_type;
+    //         //std::cout << "x "<< rect.x<< " y " << rect.y << " w "<< rect.width << " h "<< rect.height<< " s " << rect.score << " c " << in_objects[i].class_type << std::endl;
+    //
+    //         output_detect_array.objects.push_back(output_detect);
+    //
+    //     }
+    // }
+    //
+    // detect_publish.publish(output_detect_array);
+    free(darknet_image_.data);
+}
+
 // void YoloNode::config_cb(const autoware_msgs::ConfigSsd::ConstPtr& param)
 // {
 //     score_threshold_ 	= param->score_threshold;
@@ -422,7 +524,7 @@ int main(int argc, char **argv)
 
     ROS_INFO("Subscribing to... %s", image_raw_topic_str.c_str());
     // detect_publish = nh.advertise<dark_msgs::DetectArray>("detected_objects", 1);
-    // subscriber_image_raw_ = nh.subscribe(image_raw_topic_str, 1, image_callback);
+    subscriber_image_raw_ = nh.subscribe(image_raw_topic_str, 1, image_callback);
   }
 
 
